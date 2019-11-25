@@ -1,0 +1,123 @@
+import NotePadApp.*;
+import org.omg.CosNaming.*;
+import org.omg.CORBA.*;
+import org.omg.PortableServer.*;
+import org.omg.PortableServer.POA;
+
+import java.util.ArrayList;
+
+class NotePadImpl extends NotePadPOA {
+    private ORB orb;
+
+    private static ArrayList<String> arrayList = new ArrayList<String>();
+
+    void setORB(ORB orb_val) {
+        orb = orb_val;
+    }
+
+    @Override
+    public boolean addNote(String string) {
+        try {
+            arrayList.add(string);
+
+            System.out.println("String added: \n" + string + "\n");
+
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("ERROR : " + e);
+            e.printStackTrace(System.out);
+            return false;
+        }
+    }
+
+    @Override
+    public String showNotes() {
+        try {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            for (String s : arrayList) {
+                stringBuilder.append(s);
+                stringBuilder.append("\n");
+            }
+
+            System.out.println("All notes: \n" + stringBuilder.toString() + "\n");
+
+            return stringBuilder.toString();
+
+        } catch (Exception e) {
+            System.out.println("ERROR : " + e);
+            e.printStackTrace(System.out);
+            return null;
+        }
+    }
+
+    @Override
+    public boolean deleteNote(int num) {
+        if (num == 0) {
+            num = 1;
+        }
+
+        if (num - 1 > arrayList.size() - 1) {
+            num = arrayList.size();
+        }
+
+        if (num - 1 < arrayList.size() && arrayList.size() > 0) {
+            System.out.println("String " + arrayList.get(num - 1) + " deleted\n");
+
+            arrayList.remove(num - 1);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    // implement shutdown() method
+    public void shutdown() {
+        orb.shutdown(false);
+    }
+}
+
+public class Server {
+    public static void main(String[] args) {
+        try {
+            // create and initialize the ORB
+            ORB orb = ORB.init(args, null);
+
+            // get reference to rootpoa & activate the POAManager
+            POA rootpoa = POAHelper.narrow(orb.resolve_initial_references("RootPOA"));
+            rootpoa.the_POAManager().activate();
+
+            // create servant and register it with the ORB
+            NotePadImpl notePadImpl = new NotePadImpl();
+            notePadImpl.setORB(orb);
+
+            // get object reference from the servant
+            org.omg.CORBA.Object ref = rootpoa.servant_to_reference(notePadImpl);
+            NotePad href = NotePadHelper.narrow(ref);
+
+            // get the root naming context
+            // NameService invokes the name service
+            org.omg.CORBA.Object objRef = orb.resolve_initial_references("NameService");
+            // Use NamingContextExt which is part of the Interoperable
+            // Naming Service (INS) specification.
+            NamingContextExt ncRef = NamingContextExtHelper.narrow(objRef);
+
+            // bind the Object Reference in Naming
+            String name = "Hello";
+            NameComponent[] path = ncRef.to_name(name);
+            ncRef.rebind(path, href);
+
+            System.out.println("NotePad server ready and waiting ...");
+
+            // wait for invocations from clients
+            orb.run();
+        } catch (Exception e) {
+            System.err.println("ERROR: " + e);
+            e.printStackTrace(System.out);
+        }
+
+        System.out.println("NotePad server exiting ...");
+    }
+}
